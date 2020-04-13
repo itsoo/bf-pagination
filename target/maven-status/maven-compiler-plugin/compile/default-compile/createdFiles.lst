@@ -1,8 +1,0 @@
-com\sncfc\baseframework\pageplugin\PageInfo.class
-com\sncfc\baseframework\pageplugin\core\PageAspect.class
-com\sncfc\baseframework\pageplugin\PagePlugin.class
-com\sncfc\baseframework\pageplugin\util\ReflectHelpers.class
-com\sncfc\baseframework\pageplugin\core\Page.class
-com\sncfc\baseframework\pageplugin\util\SqlGenerators$1.class
-com\sncfc\baseframework\pageplugin\core\Dialect.class
-com\sncfc\baseframework\pageplugin\util\SqlGenerators.class
