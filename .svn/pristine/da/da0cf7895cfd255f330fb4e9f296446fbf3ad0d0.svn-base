@@ -1,0 +1,72 @@
+package com.sncfc.baseframework.pageplugin.util;
+
+import com.sncfc.baseframework.pageplugin.PageInfo;
+
+import java.lang.reflect.Field;
+
+/**
+ * ReflectHelpers
+ *
+ * @author zxy
+ */
+public class ReflectHelpers {
+
+    private static Field getObjectField(Object obj, String fieldName) throws NoSuchFieldException {
+        Class<?> clazz = obj.getClass();
+        try {
+            return clazz.getDeclaredField(fieldName);
+        } catch (NoSuchFieldException | SecurityException ignore) {
+            return clazz.getField(fieldName);
+        }
+    }
+
+    public static PageInfo getFieldValue(Object obj) {
+        try {
+            return (PageInfo) getFieldValue(obj, PageInfo.BEAN_MUST_HAS);
+        } catch (IllegalAccessException | NoSuchFieldException e) {
+            throw new IllegalArgumentException("DTO must be PageInfo page property", e);
+        }
+    }
+
+    public static Object getFieldValue(Object obj, String fieldName)
+            throws IllegalAccessException, NoSuchFieldException {
+        Field field = getObjectField(obj, fieldName);
+        if (field.isAccessible()) {
+            return field.get(obj);
+        }
+
+        field.setAccessible(true);
+        Object value = field.get(obj);
+        field.setAccessible(false);
+
+        return value;
+    }
+
+    public static void setFieldValue(Object obj, Object value) {
+        try {
+            setFieldValue(obj, PageInfo.BEAN_MUST_HAS, value);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalArgumentException("DTO must be PageInfo page property", e);
+        }
+    }
+
+    public static void setFieldValue(Object obj, String fieldName, Object value)
+            throws IllegalAccessException, NoSuchFieldException {
+        Field field = getObjectField(obj, fieldName);
+        if (field.isAccessible()) {
+            field.set(obj, value);
+        } else {
+            field.setAccessible(true);
+            field.set(obj, value);
+            field.setAccessible(false);
+        }
+    }
+
+    public static void copyObjectField(Object originObj, Object targetObj, String fieldName) {
+        try {
+            if (getObjectField(originObj, fieldName) != null) {
+                setFieldValue(targetObj, getFieldValue(originObj));
+            }
+        } catch (NoSuchFieldException ignore) {}
+    }
+}

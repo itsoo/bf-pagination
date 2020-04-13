@@ -1,0 +1,17 @@
+package com.sncfc.baseframework.pageplugin;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.convert.converter.Converter;
+
+/**
+ * @author zxy
+ */
+@Configuration
+public class PageInfoConverter implements Converter<String, PageInfo> {
+
+    @Override
+    public PageInfo convert(String source) {
+        // TODO: 这里处理字符串转换为 PageInfo ！！！
+        return null;
+    }
+}

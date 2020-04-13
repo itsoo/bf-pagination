@@ -1,0 +1,54 @@
+package com.sncfc.baseframework.pageplugin.util;
+
+import com.sncfc.baseframework.pageplugin.PageInfo;
+import com.sncfc.baseframework.pageplugin.core.Dialect;
+
+/**
+ * SqlGenerators
+ *
+ * @author zxy
+ */
+public class SqlGenerators {
+
+    /**
+     * 组织查询总记录数 SQL
+     *
+     * @param sql String
+     * @return count sql
+     */
+    public static String generateCountSql(String sql) {
+        return String.format("SELECT count(*) FROM (%s) \"$tmp_0\"", sql);
+    }
+
+    /**
+     * 根据数据库方言组织分页 SQL
+     *
+     * @param dialect  Dialect
+     * @param sql      String
+     * @param pageInfo PageInfo
+     * @return page sql
+     */
+    public static String generatePageSql(Dialect dialect, String sql, PageInfo pageInfo) {
+        if (pageInfo == null) {
+            return sql;
+        }
+
+        switch (dialect) {
+            case MYSQL:
+                return mysql(sql, pageInfo);
+            case ORACLE:
+                return oracle(sql, pageInfo);
+            default:
+                throw new IllegalArgumentException("未被分页组件支持的数据库");
+        }
+    }
+
+    private static String mysql(String sql, PageInfo pageInfo) {
+        return String.format("SELECT * FROM (%s) LIMIT %d, %d", sql, pageInfo.getStartRows(), pageInfo.getPageSize());
+    }
+
+    private static String oracle(String sql, PageInfo pageInfo) {
+        return String.format("SELECT * FROM (SELECT \"$tmp_0\".*, rownum \"$rn_0\" FROM (%s) \"$tmp_0\") WHERE \"$rn_0\" > %d AND \"$rn_0\" <= %d",
+                sql, pageInfo.getStartRows(), pageInfo.getEndRows());
+    }
+}

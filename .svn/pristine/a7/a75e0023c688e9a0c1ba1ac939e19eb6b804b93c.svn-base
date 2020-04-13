@@ -1,0 +1,133 @@
+package com.sncfc.baseframework.pageplugin;
+
+import com.sncfc.baseframework.pageplugin.core.Dialect;
+import com.sncfc.baseframework.pageplugin.util.ReflectHelpers;
+import com.sncfc.baseframework.pageplugin.util.SqlGenerators;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.ibatis.executor.statement.StatementHandler;
+import org.apache.ibatis.mapping.BoundSql;
+import org.apache.ibatis.mapping.MappedStatement;
+import org.apache.ibatis.mapping.ParameterMapping;
+import org.apache.ibatis.plugin.Interceptor;
+import org.apache.ibatis.plugin.Intercepts;
+import org.apache.ibatis.plugin.Invocation;
+import org.apache.ibatis.plugin.Signature;
+import org.apache.ibatis.reflection.SystemMetaObject;
+import org.apache.ibatis.session.Configuration;
+import org.springframework.stereotype.Component;
+
+import javax.xml.bind.PropertyException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.List;
+import java.util.Properties;
+
+import static com.sncfc.baseframework.pageplugin.PageInfo.defaultPageSize;
+
+/**
+ * 分页插件
+ *
+ * @author zxy
+ */
+@Slf4j
+@Component
+@Intercepts(@Signature(type = StatementHandler.class, method = "prepare", args = {Connection.class, Integer.class}))
+public class PagePlugin implements Interceptor {
+
+    /*** 数据库方言 */
+    private static Dialect dialect;
+    /*** 需要拦截的 Mapper */
+    private static String regexp;
+
+    @Override
+    public Object intercept(Invocation invocation) throws Throwable {
+        if (invocation.getTarget() instanceof StatementHandler) {
+            StatementHandler handler = (StatementHandler) invocation.getTarget();
+            if (getMappedStatement(handler).getId().matches(regexp)) {
+                BoundSql boundSql = getBoundSql(handler);
+                Object params = boundSql.getParameterObject();
+                if (!ReflectHelpers.getFieldValue(params).isPageList()) {
+                    String countSql = SqlGenerators.generateCountSql(boundSql.getSql());
+                    int count = queryTotalCount(handler, countSql, (Connection) invocation.getArgs()[0], params);
+                    PageInfo pageInfo = handlePageInfo(params, count);
+                    PageInfo condition = count <= pageInfo.getPageSize() ? null : pageInfo;
+                    String pageSql = SqlGenerators.generatePageSql(dialect, boundSql.getSql(), condition);
+                    ReflectHelpers.setFieldValue(boundSql, "sql", pageSql);
+                }
+            }
+        }
+
+        return invocation.proceed();
+    }
+
+    @Override
+    public void setProperties(Properties properties) {
+        dialect = Dialect.getEnum(properties.getProperty("dialect"));
+        if (dialect == null) {
+            log.error("必要的属性为空", new PropertyException("dialect 属性用于指定数据库方言"));
+        }
+
+        regexp = properties.getProperty("regexp");
+        if (regexp == null || "".equals(regexp.trim())) {
+            log.error("必要的属性为空", new PropertyException("regexp 属性用于指定 SQL 拦截表达式"));
+        }
+
+        String pageSize = properties.getProperty("pageSize");
+        if (pageSize != null && !"".equals(pageSize.trim())) {
+            defaultPageSize = Integer.parseInt(pageSize);
+        }
+    }
+
+    /**
+     * 查询总记录数
+     *
+     * @param handler    StatementHandler
+     * @param sql        String
+     * @param connection Connection
+     * @param obj        Object
+     * @return int
+     * @throws Throwable Throwable
+     */
+    private int queryTotalCount(StatementHandler handler, String sql, Connection connection, Object obj)
+            throws Throwable {
+        BoundSql boundSql = getBoundSql(handler);
+        Configuration configuration = getMappedStatement(handler).getConfiguration();
+        List<ParameterMapping> parameterMappings = boundSql.getParameterMappings();
+        BoundSql countBoundSql = new BoundSql(configuration, sql, parameterMappings, obj);
+
+        ReflectHelpers.copyObjectField(boundSql, countBoundSql, "metaParameters");
+        ReflectHelpers.copyObjectField(boundSql, countBoundSql, "additionalParameters");
+
+        try (PreparedStatement countStatement = connection.prepareStatement(sql)) {
+            handler.getParameterHandler().setParameters(countStatement);
+
+            try (ResultSet rs = countStatement.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        }
+    }
+
+    private PageInfo handlePageInfo(Object params, int count) {
+        if (params instanceof PageInfo) {
+            ((PageInfo) params).setTotalCount(count);
+            return ((PageInfo) params);
+        }
+
+        PageInfo pageInfo = getPageInfo(params);
+        pageInfo.setTotalCount(count);
+        return pageInfo;
+    }
+
+    private PageInfo getPageInfo(Object params) {
+        return (PageInfo) ReflectHelpers.getFieldValue(params);
+    }
+
+    private MappedStatement getMappedStatement(StatementHandler handler) {
+        return (MappedStatement) SystemMetaObject.forObject(handler).getValue("delegate.mappedStatement");
+    }
+
+    private BoundSql getBoundSql(StatementHandler handler) {
+        return (BoundSql) SystemMetaObject.forObject(handler).getValue("delegate.boundSql");
+    }
+}

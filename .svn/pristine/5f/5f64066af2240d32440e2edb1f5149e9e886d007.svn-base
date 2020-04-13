@@ -1,0 +1,82 @@
+package com.sncfc.baseframework.pageplugin;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.sncfc.baseframework.pageplugin.util.ReflectHelpers;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.experimental.Accessors;
+
+import java.util.List;
+
+/**
+ * 结果页
+ *
+ * @author zxy
+ */
+@Accessors(chain = true)
+@Data
+@NoArgsConstructor
+public class PageInfo {
+
+    /*** 封装 page 属性 */
+    @JsonIgnore
+    public static final String BEAN_MUST_HAS = "page";
+    /*** 默认页容量 */
+    @JsonIgnore
+    static Integer defaultPageSize = 10;
+    /*** 分页属性 false 不分页 */
+    @JsonIgnore
+    private boolean pageList = true;
+
+    /*** 当前页数 */
+    private Integer pageNum = 1;
+    /*** 页容量 */
+    private Integer pageSize = defaultPageSize;
+    /*** 总页数 */
+    private Integer totalPage = 0;
+    /*** 总记录数 */
+    private Integer totalCount = 0;
+    /*** 查询结果集 */
+    private List<?> dataList;
+    /*** 有上一页 */
+    private boolean hasPrePage;
+    /*** 有下一页 */
+    private boolean hasNextPage;
+
+    /**
+     * @param obj Object
+     * @return 实例化
+     */
+    public static PageInfo instance(Object obj) {
+        try {
+            return (PageInfo) ReflectHelpers.getFieldValue(obj, PageInfo.BEAN_MUST_HAS);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalArgumentException("DTO must has <PageInfo>page property", e);
+        }
+    }
+
+    /**
+     * @return 分页起始行号
+     */
+    @JsonIgnore
+    public int getStartRows() {
+        return (pageNum - 1) * pageSize;
+    }
+
+    /**
+     * @return 分页结束行号
+     */
+    @JsonIgnore
+    public int getEndRows() {
+        return pageNum * pageSize;
+    }
+
+    /**
+     * @return 实例化
+     */
+    PageInfo instance() {
+        final int result = (int) Math.ceil(((double) totalCount) / pageSize);
+        this.totalPage = result == 0 ? 1 : result;
+        return setHasPrePage(pageNum > 1).setHasNextPage(pageNum < totalPage);
+    }
+}
